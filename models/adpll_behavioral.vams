@@ -1,0 +1,73 @@
+
+`include "disciplines.vams"
+
+module adpll_behavioral (
+  input electrical ref_clk,  // Reference clock (analog)
+  output electrical dco_clk, // DCO output (analog)
+  input real vdd,            // Supply voltage
+  input real vss             // Ground
+);
+
+  // Internal signals
+  electrical fb_clk;         // Feedback clock (from divider)
+  real phase_error;          // Phase error (TDC output)
+  real filtered_error;       // Filtered error (PI controller)
+  integer coarse_tune;       // Coarse tuning word (CTW)
+  integer fine_tune;         // Fine tuning word (FTW)
+  real freq_dco;             // DCO frequency (Hz)
+  real tdc_resolution = 10e-12; // TDC resolution (10ps)
+
+  //-------------------------------------------------------
+  // Phase Detector + TDC (Behavioral Model)
+  //-------------------------------------------------------
+  analog begin
+    real t_ref, t_fb;
+    @(cross(V(ref_clk) - 0.5, +1)) t_ref = $realtime;
+    @(cross(V(fb_clk) - 0.5, +1)) t_fb = $realtime;
+    phase_error = (t_ref - t_fb) / tdc_resolution; // TDC quantization
+  end
+
+  //-------------------------------------------------------
+  // Digital Loop Filter (Proportional-Integral)
+  //-------------------------------------------------------
+  parameter real Kp = 0.1;   // Proportional gain
+  parameter real Ki = 0.01;  // Integral gain
+  real integral;
+
+  always @(timer(1e-9)) begin // Discrete-time update every 1ns
+    filtered_error = Kp * phase_error + Ki * integral;
+    integral = integral + phase_error;
+  end
+
+  //-------------------------------------------------------
+  // Controller (Coarse/Fine Tuning)
+  //-------------------------------------------------------
+  always @(filtered_error) begin
+    coarse_tune = 8 + (filtered_error > 0 ? 1 : -1); // VLRO stages
+    fine_tune = 128 + 2 * $floor(filtered_error);    // Path selector
+  end
+
+  //-------------------------------------------------------
+  // DCO (Behavioral Frequency Tuning)
+  //-------------------------------------------------------
+  parameter real f0 = 1e9;   // Center frequency (1 GHz)
+  parameter real Kv = 1e6;   // DCO gain (1 MHz/LSB)
+  real freq_target;
+
+  analog begin
+    freq_target = f0 + Kv * coarse_tune + 0.1 * Kv * fine_tune;
+    V(dco_clk) <+ 0.5 * (1 + sin(2 * `M_PI * freq_target * $realtime));
+  end
+
+  //-------------------------------------------------------
+  // Feedback Divider (÷N)
+  //-------------------------------------------------------
+  parameter integer N = 8;   // Divide ratio
+  integer count;
+
+  always @(cross(V(dco_clk) - 0.5, +1)) begin
+    count = (count >= N-1) ? 0 : count + 1;
+    V(fb_clk) <+ (count == 0) ? 1 : 0;
+  end
+
+endmodule
