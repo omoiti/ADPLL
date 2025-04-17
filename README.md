@@ -12,3 +12,27 @@ A synthesizable, portable ADPLL design based on standard cells. This project imp
 ## Block Diagram
 ![ADPLL Top Level Diagram](adpll.jpg)
 
+## Modules
+
+| Module                 | Description                                                                 |
+|------------------------|-----------------------------------------------------------------------------|
+| `adpll`                | Top-level ADPLL integrating all components.                                |
+| `phase_detector`       | DFF-based phase-frequency detector (PFD) generating UP/DN error signals.   |
+| `tdc`                  | Two-level time-to-digital converter (coarse counter + fine delay line).    |
+| `digital_filter`       | Proportional-Integral (PI) filter for loop stability.                      |
+| `controller`           | Generates Coarse/Fine Tuning Words (CTW/FTW) for DCO.                      |
+| `dco`                  | Digitally Controlled Oscillator (VLRO + NAND path mux).                    |
+| `divider`              | Divides DCO output to generate feedback clock.                             |
+
+## Testbenches
+
+| Testbench               | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| `adpll_tb`             | Validates full ADPLL locking behavior and frequency tracking.              |
+| `phase_detector_tb`    | Tests UP/DN signal generation for leading/lagging clock edges.             |
+| `tdc_tb`               | Measures phase error accuracy (coarse and fine resolution).                |
+| `digital_filter_tb`    | Verifies glitch filtering and PI control logic.                            |
+| `controller_tb`        | Checks CTW/FTW generation based on filtered error signals.                 |
+| `dco_tb`               | Tests DCO frequency tuning with varying CTW/FTW codes.                     |
+| `divider_tb`           | Validates frequency division (÷N) functionality.                           |
+
